@@ -34,6 +34,11 @@ from dataclasses import dataclass
 import numpy as np
 import pandas as pd
 
+# Defensive backstop: pairs with formation spread sigma below this are degenerate
+# (same-company dual classes). Formation already screens them, but we guard here
+# too so the engine can never set a meaningless ~0 threshold.
+MIN_SPREAD_SIGMA = 1e-4
+
 
 @dataclass
 class Trade:
@@ -73,8 +78,11 @@ def trade_pair(
     """
     sigma = formation_sigma(norm_formation, a, b)
     thresh = k * sigma
-    if not np.isfinite(thresh) or thresh == 0:
-        return []  # degenerate pair (no spread variation) -> no trades
+    # Defensive backstop: degenerate near-zero-sigma pairs (same-company dual
+    # classes) make the threshold meaningless. Formation should already screen
+    # these, but guard here too so the engine can never divide by ~0.
+    if not np.isfinite(thresh) or sigma < MIN_SPREAD_SIGMA:
+        return []
 
     pa = norm_trading[a].to_numpy()
     pb = norm_trading[b].to_numpy()
@@ -169,7 +177,6 @@ if __name__ == "__main__":
     print(f"entry_date  : {tr.entry_date.date()}")
     print(f"exit_date   : {tr.exit_date.date()}")
     print(f"entry_spread: {tr.entry_spread:.3f}  (expect 0.048: day AFTER 0.050 signal)")
-    print(f"exit_spread : {tr.exit_spread:.3f}")
     print(f"forced_close: {tr.forced_close}")
     assert tr.direction == -1
     assert abs(tr.entry_spread - 0.048) < 1e-9  # delayed fill, not 0.050
