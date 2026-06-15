@@ -1,8 +1,9 @@
-"""Transaction-cost sensitivity sweep: find the break-even cost level.
+"""Transaction-cost sensitivity sweep (cached): find the break-even cost level.
 
-GGR's edge was real but cost-sensitive. This sweep re-runs the full backtest at
-several flat per-leg cost levels and reports net mean monthly return for each
-pair set, locating the BREAK-EVEN -- the cost at which the edge hits zero.
+GGR's edge was real but cost-sensitive. This sweep builds the formation+trade
+cache ONCE, then re-applies each flat per-leg cost level cheaply, reporting net
+mean monthly return for each pair set and locating the BREAK-EVEN -- the cost at
+which the edge hits zero.
 
 Each round-trip pair trade touches 4 legs, so a cost of c bps/leg removes
 4c/10000 in return per trade. With gross top20 ~0.13%/month, even modest costs
@@ -15,12 +16,11 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import numpy as np
 import pandas as pd
 
 import sys
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from backtest.engine import run_backtest
+from backtest.engine_cached import build_cache, returns_from_cache
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 PANEL = PROJECT_ROOT / "data" / "processed" / "price_panel_clean.parquet"
@@ -32,9 +32,14 @@ PAIR_SETS = ["top5", "top20", "control_101_120"]
 
 def main() -> None:
     panel = pd.read_parquet(PANEL)
+
+    print("Building formation+trade cache once...", flush=True)
+    cache = build_cache(panel, k=2.0)
+    print("Cache built. Sweeping cost levels (fast)...\n", flush=True)
+
     rows = []
     for bps in COST_LEVELS:
-        out = run_backtest(panel, k=2.0, cost_bps_per_leg=bps)
+        out = returns_from_cache(cache, cost_bps_per_leg=bps)
         row = {"bps_per_leg": bps, "cost_per_roundtrip_pct": 4 * bps / 100}
         for s in PAIR_SETS:
             m = out[s]["committed"]
@@ -43,13 +48,12 @@ def main() -> None:
         rows.append(row)
         print(f"bps/leg={bps:3d}  "
               + "  ".join(f"{s.split('_')[0]}={row[f'{s}_mean_monthly']:+.5f}"
-                          for s in PAIR_SETS))
+                          for s in PAIR_SETS), flush=True)
 
     df = pd.DataFrame(rows)
     df.to_csv(OUT, index=False)
     print(f"\nSaved: {OUT.relative_to(PROJECT_ROOT)}")
 
-    # Locate break-even for top20 (committed): highest bps with positive mean.
     t20 = df[["bps_per_leg", "top20_mean_monthly"]]
     pos = t20[t20["top20_mean_monthly"] > 0]
     if len(pos):
