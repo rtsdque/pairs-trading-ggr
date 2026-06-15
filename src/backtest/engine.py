@@ -67,6 +67,7 @@ def run_cohort(
     panel: pd.DataFrame,
     formation_start: pd.Timestamp,
     k: float = 2.0,
+    cost_bps_per_leg: float = 0.0,
 ) -> CohortResult | None:
     """Run one formation+trading cohort starting at formation_start."""
     f_start = formation_start
@@ -111,7 +112,8 @@ def run_cohort(
             pair_trades[(p.a, p.b)] = trade_pair(p.a, p.b, norm_form, norm_trade,
                                                  k=k, delay=1)
         daily_by_set[set_name] = portfolio_daily_returns(
-            pair_trades, norm_trade, n_committed=n_committed
+            pair_trades, norm_trade, n_committed=n_committed,
+            cost_bps_per_leg=cost_bps_per_leg,
         )
 
     return CohortResult(
@@ -125,6 +127,7 @@ def run_backtest(
     start: str | None = None,
     end: str | None = None,
     k: float = 2.0,
+    cost_bps_per_leg: float = 0.0,
 ) -> dict[str, pd.DataFrame]:
     """Full staggered walk-forward backtest.
 
@@ -146,7 +149,7 @@ def run_backtest(
     per_set_daily: dict[str, list[pd.DataFrame]] = {s: [] for s in PAIR_SETS}
     n_cohorts = 0
     for f_start in formation_starts:
-        cohort = run_cohort(panel, f_start, k=k)
+        cohort = run_cohort(panel, f_start, k=k, cost_bps_per_leg=cost_bps_per_leg)
         if cohort is None:
             continue
         n_cohorts += 1
