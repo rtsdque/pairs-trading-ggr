@@ -1,5 +1,7 @@
 # Pairs Trading: A Modern Replication and Cointegration Extension
 
+**[→ View the live dashboard](https://pairstradingggr.streamlit.app/)**
+
 This project asks a simple question: does pairs trading, one of the most famous
 systematic trading strategies ever published, still work today?
 
@@ -62,6 +64,8 @@ AIG in 2008 — the difference being whether the move snaps back the next day or
 sticks. The dashboard's "Data & Survivorship" section lays all of this out.
 
 ## Reproducing it
+
+The dashboard is live at **[pairstradingggr.streamlit.app](https://pairstradingggr.streamlit.app/)** — no setup needed. To run the full pipeline yourself:
 
 ```bash
 git clone https://github.com/rtsdque/pairs-trading-ggr.git
